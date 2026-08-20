@@ -1,113 +1,95 @@
 <script setup lang="ts">
 const calc = useCalculatorStore()
+const { Result, expression, operator, history } = storeToRefs(calc)
 
-const Result = ref('0')
-const previous = ref<number | null>(null)
-const operator = ref<string | null>(null)
-const waitingForNewInput = ref(false)
-
-// small trail above the main number, e.g. "12 +"
-const expression = computed(() =>
-  previous.value === null ? '' : `${previous.value} ${operator.value ?? ''}`
-)
-
-// avoid floating point noise (0.1 + 0.2 → 0.30000000000000004) and flag bad math
-function format(n: number) {
-  return Number.isFinite(n) ? String(Number(n.toPrecision(12))) : 'Error'
-}
-
-const toRad = (deg: number) => (deg * Math.PI) / 180
-
-function inputNum(d:string) {
-  if (waitingForNewInput.value) {
-    Result.value = d
-    waitingForNewInput.value = false   // 
-  } else if (Result.value === '0') {
-    Result.value = d
-  } else {
-    Result.value = Result.value + d
-  }
-}
-
-function clear() {
-  Result.value = "0"
-}
-
-function setOperator(op:string) {
-  previous.value =parseFloat(Result.value)
-  operator.value = op
-  waitingForNewInput.value = true
-}
-
-function equals() {
-  if (previous.value === null || operator.value === null) return
-
-  const current = parseFloat(Result.value)
-
-  if (operator.value === '+') {
-    Result.value = format(previous.value + current)
-  } else if (operator.value === '-') {
-    Result.value = format(previous.value - current)
-  } else if (operator.value === '×') {
-    Result.value = format(previous.value * current)
-  } else if (operator.value === '÷') {
-    Result.value = format(previous.value / current)
-  } else if (operator.value === '√') {
-    // nth root: previous √ n  →  previous ^ (1 / n)
-    Result.value = format(Math.pow(previous.value, 1 / current))
-  } else if (operator.value === '^') {
-    // power: previous ^ current
-    Result.value = format(Math.pow(previous.value, current))
-  }
-
-  previous.value = null
-  operator.value = null
-  waitingForNewInput.value = true
-}
-
-// scientific functions apply straight to the number on screen (degrees for trig)
-function applyUnary(fn: (x: number) => number) {
-  Result.value = format(fn(parseFloat(Result.value)))
-  waitingForNewInput.value = true
-}
-
-function insertConstant(value: number) {
-  Result.value = format(value)
-  waitingForNewInput.value = true
-}
-
-
-
-
+// shrink the result as it grows so it always fits on one line, no scrolling needed
+const resultFontSize = computed(() => {
+  const len = Result.value.length
+  if (len <= 6) return '3rem'
+  if (len <= 9) return '2.25rem'
+  if (len <= 12) return '1.75rem'
+  return '1.25rem'
+})
 </script>
 <template>
   <main class="min-h-screen bg-amber-500 flex items-center justify-center p-4">
-    <div>{{ calc.Result }}</div>
     <section class="w-full max-w-xs rounded-3xl bg-neutral-900 p-5 shadow-2xl shadow-black/30">
-      <!-- screen -->
-      <div class="mb-5 rounded-2xl bg-neutral-950/60 px-4 py-5 text-right [font-variant-numeric:tabular-nums]">
-        <p class="h-5 truncate text-sm text-neutral-500">{{ expression }}&nbsp;</p>
-        <p class="mt-1 overflow-x-auto whitespace-nowrap text-5xl font-light text-white">{{ Result }}</p>
+      <!-- screen: input (live, what you're typing) and result (last answer) as separate sections -->
+      <div class="mb-5 space-y-3 rounded-2xl bg-neutral-950/60 px-4 py-4 [font-variant-numeric:tabular-nums]">
+        <div class="text-right">
+          <p class="text-xs font-medium uppercase tracking-wide text-neutral-500">Input</p>
+          <p class="h-5 truncate text-sm text-neutral-400">{{ expression }}&nbsp;</p>
+          <p
+            class="overflow-x-auto whitespace-nowrap font-light text-white transition-[font-size] duration-150"
+            :style="{ fontSize: resultFontSize }"
+          >{{ Result }}</p>
+        </div>
+
+        <div class="border-t border-neutral-800 pt-3 text-right">
+          <p class="text-xs font-medium uppercase tracking-wide text-neutral-500">History</p>
+          <p v-if="!history.length" class="mt-1 text-sm text-neutral-600">No calculations yet</p>
+          <ul v-else class="mt-1 max-h-28 space-y-1 overflow-y-auto">
+            <li
+              v-for="(entry, i) in history"
+              :key="i"
+              class="truncate text-sm text-neutral-400"
+            >
+              {{ entry }}
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- scientific functions -->
+      <div class="mb-3 grid grid-cols-4 gap-2">
+        <button
+          v-for="fn in [
+            { label: 'sin', run: () => calc.applyUnary((x) => Math.sin(calc.toRad(x))) },
+            { label: 'cos', run: () => calc.applyUnary((x) => Math.cos(calc.toRad(x))) },
+            { label: 'tan', run: () => calc.applyUnary((x) => Math.tan(calc.toRad(x))) },
+            { label: '√', run: () => calc.applyUnary(Math.sqrt) },
+            { label: 'log', run: () => calc.applyUnary(Math.log10) },
+            { label: 'ln', run: () => calc.applyUnary(Math.log) },
+            { label: 'x²', run: () => calc.applyUnary((x) => x ** 2) },
+            { label: '1/x', run: () => calc.applyUnary((x) => 1 / x) },
+            { label: 'π', run: () => calc.insertConstant(Math.PI) },
+            { label: 'e', run: () => calc.insertConstant(Math.E) },
+          ]"
+          :key="fn.label"
+          type="button"
+          class="rounded-xl bg-neutral-800 py-2 text-sm font-medium text-neutral-200 transition-colors duration-150 hover:bg-neutral-700 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+          @click="fn.run"
+        >
+          {{ fn.label }}
+        </button>
+        <button
+          type="button"
+          title="Root of n: enter a number, tap ⁿ√, enter n, then ="
+          class="rounded-xl py-2 text-sm font-medium transition-colors duration-150 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+          :class="operator === '√' ? 'bg-white text-neutral-900' : 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700'"
+          @click="calc.setOperator('√')"
+        >
+          ⁿ√
+        </button>
+        <button
+          type="button"
+          title="Power: enter a base, tap xʸ, enter the exponent, then ="
+          class="rounded-xl py-2 text-sm font-medium transition-colors duration-150 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+          :class="operator === '^' ? 'bg-white text-neutral-900' : 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700'"
+          @click="calc.setOperator('^')"
+        >
+          xʸ
+        </button>
       </div>
 
       <!-- keypad -->
       <div class="grid grid-cols-4 gap-3">
         <button
-          type="button"
-          title="Root of n: enter a number, tap ⁿ√, enter n, then ="
-          class="col-span-4 rounded-2xl py-3 text-xl font-medium transition-colors duration-150 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          :class="operator === '√' ? 'bg-white text-amber-500' : 'bg-amber-500 text-white hover:bg-amber-400'"
-          @click="setOperator('√')"
-        >
-          ⁿ√
-        </button>
-
-        <button
           v-for="n in ['7','8','9']"
           :key="n"
           type="button"
           class="aspect-square rounded-2xl bg-neutral-700 text-xl font-medium text-white transition-colors duration-150 hover:bg-neutral-600 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
-          @click="inputNum(n)"
+          @click="calc.inputNum(n)"
         >
           {{ n }}
         </button>
@@ -115,7 +97,7 @@ function insertConstant(value: number) {
           type="button"
           class="aspect-square rounded-2xl text-xl font-medium transition-colors duration-150 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           :class="operator === '÷' ? 'bg-white text-amber-500' : 'bg-amber-500 text-white hover:bg-amber-400'"
-          @click="setOperator('÷')"
+          @click="calc.setOperator('÷')"
         >
           ÷
         </button>
@@ -125,7 +107,7 @@ function insertConstant(value: number) {
           :key="n"
           type="button"
           class="aspect-square rounded-2xl bg-neutral-700 text-xl font-medium text-white transition-colors duration-150 hover:bg-neutral-600 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
-          @click="inputNum(n)"
+          @click="calc.inputNum(n)"
         >
           {{ n }}
         </button>
@@ -133,7 +115,7 @@ function insertConstant(value: number) {
           type="button"
           class="aspect-square rounded-2xl text-xl font-medium transition-colors duration-150 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           :class="operator === '×' ? 'bg-white text-amber-500' : 'bg-amber-500 text-white hover:bg-amber-400'"
-          @click="setOperator('×')"
+          @click="calc.setOperator('×')"
         >
           ×
         </button>
@@ -143,7 +125,7 @@ function insertConstant(value: number) {
           :key="n"
           type="button"
           class="aspect-square rounded-2xl bg-neutral-700 text-xl font-medium text-white transition-colors duration-150 hover:bg-neutral-600 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
-          @click="inputNum(n)"
+          @click="calc.inputNum(n)"
         >
           {{ n }}
         </button>
@@ -151,7 +133,7 @@ function insertConstant(value: number) {
           type="button"
           class="aspect-square rounded-2xl text-xl font-medium transition-colors duration-150 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           :class="operator === '-' ? 'bg-white text-amber-500' : 'bg-amber-500 text-white hover:bg-amber-400'"
-          @click="setOperator('-')"
+          @click="calc.setOperator('-')"
         >
           −
         </button>
@@ -159,21 +141,21 @@ function insertConstant(value: number) {
         <button
           type="button"
           class="aspect-square rounded-2xl bg-red-500/90 text-lg font-semibold text-white transition-colors duration-150 hover:bg-red-500 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-300"
-          @click="clear"
+          @click="calc.clear"
         >
           C
         </button>
         <button
           type="button"
           class="aspect-square rounded-2xl bg-neutral-700 text-xl font-medium text-white transition-colors duration-150 hover:bg-neutral-600 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
-          @click="inputNum('0')"
+          @click="calc.inputNum('0')"
         >
           0
         </button>
         <button
           type="button"
           class="aspect-square rounded-2xl bg-amber-600 text-xl font-semibold text-white transition-colors duration-150 hover:bg-amber-700 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          @click="equals()"
+          @click="calc.equals()"
         >
           =
         </button>
@@ -181,7 +163,7 @@ function insertConstant(value: number) {
           type="button"
           class="aspect-square rounded-2xl text-xl font-medium transition-colors duration-150 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           :class="operator === '+' ? 'bg-white text-amber-500' : 'bg-amber-500 text-white hover:bg-amber-400'"
-          @click="setOperator('+')"
+          @click="calc.setOperator('+')"
         >
           +
         </button>
