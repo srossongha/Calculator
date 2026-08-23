@@ -17,12 +17,7 @@ pnpm build            # production build
 
 ```
 app/
-├── pages/index.vue              holds the state, wires the pieces together
-├── components/calculator/
-│   ├── Screen.vue               the lime display          (props only)
-│   ├── CursorPad.vue            the arrow cross           (emits only)
-│   ├── Keypad.vue               the button grid           (emits only)
-│   └── History.vue              the drop-down             (props + emits)
+├── pages/index.vue              the whole calculator: state + markup
 ├── composables/
 │   ├── useCalculator.ts         state + what each button does
 │   └── useLocalStorage.ts       keeping a ref in localStorage
@@ -40,28 +35,28 @@ never sees your typed text; `input.ts` only looks at what you have typed so
 far; `parser.ts` and `display.ts` read the same text but answer two different
 questions ("what does this equal" vs "what should this look like").
 
-## How the pieces talk
+## Where things live
+
+There are three layers, and the rule is that each one only knows about the
+layer below it:
 
 ```
-                 useCalculator()      <- ALL state lives here, called ONCE
-                        |
-        index.vue ------+---------------------
-         |              |         |          |
-     props|  ^emits     |         |          |
-          v  |          v         v          v
-       Screen        CursorPad  Keypad    History
+  index.vue          the markup, and the buttons that call things
+       |
+  useCalculator()    the state: expression, answer, cursor, Ans, history
+       |
+  app/utils/         pure functions — given some text, work something out
 ```
 
-- **Down = props.** Values a component displays. It may read them, never assign to them.
-- **Up = emits.** "A button was pressed." The component reports it and `index.vue` decides what it means.
+`app/utils/` is the important boundary: nothing in there imports Vue, touches
+a `ref`, or knows a screen exists. That is what lets you test the maths on its
+own, and why a change to how a root bar is drawn cannot affect what an
+expression evaluates to.
 
-`Keypad.vue` has no idea what `÷` does — it fires `$emit('operator', '÷')` and
-stops. All the thinking stays in one file, so when something misbehaves there
-is only one place to look.
-
-> **Do not** call `useCalculator()` inside a child component. A composable
-> creates fresh state every time it is called, so you would end up with several
-> separate calculators that never see each other's numbers.
+`useCalculator()` is called **once**, at the top of `index.vue`. A composable
+creates fresh state every time it is called, so calling it a second time
+somewhere else would give you a separate calculator that never sees the first
+one's numbers.
 
 ## How the maths works
 
@@ -87,11 +82,11 @@ difference is the whole reason exponents behave correctly.
 ## Things that look like mistakes but aren't
 
 **1. Auto-imports mean a name may only exist in one file.**
-Nuxt makes everything in `app/utils/` and `app/components/` available without
+Nuxt makes everything in `app/utils/` and `app/composables/` available without
 an import line. If two files export the same name, Nuxt silently picks one and
 you cannot tell which — so never keep a "just in case" copy of a function.
-Packages from `node_modules` are *not* auto-imported, which is why
-`History.vue` has real `import` lines for Headless UI and Heroicons.
+Packages from `node_modules` are *not* auto-imported, which is why `index.vue`
+has real `import` lines for Headless UI and Heroicons.
 
 **2. `CURSOR` is an invisible character.**
 It is `\u0001`, a control character with no shape, slipped into the text so the
@@ -99,10 +94,11 @@ cursor travels inside whichever run it lands in and comes out at the right size
 even inside an exponent. In the source always write the `\u0001` escape, never
 paste the real character — `grep` cannot show it to you, only `od -c` can.
 
-**3. The dangling `>` in `Screen.vue`.**
-Tags are deliberately jammed together with the closing `>` parked on the next
-line. A newline between two tags becomes a real space on screen, which would
-render `12` as `1 2`. It is ugly and it is correct — do not tidy it.
+**3. The dangling `>` in the screen markup.**
+In the display block of `index.vue`, tags are deliberately jammed together with
+the closing `>` parked on the next line. A newline between two tags becomes a
+real space on screen, which would render `12` as `1 2`. It is ugly and it is
+correct — do not tidy it.
 
 ## Note on Pinia
 
