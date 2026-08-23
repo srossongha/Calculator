@@ -14,6 +14,9 @@ const {
   chooseOperator, moveCursor, equals,
   restoreHistory, clearHistory, clearAll,
 } = useCalculator()
+
+
+const { counter, incresment, decrement } = useCounter()
 </script>
 
 <template>
@@ -170,6 +173,7 @@ const {
 
         <button class="col-span-4 rounded-xl bg-amber-600 py-3 text-xl text-white" @click="equals">=</button>
       </div>
+      <div>{{ counter }}</div>
     </section>
   </main>
 </template>
