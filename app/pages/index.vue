@@ -16,7 +16,7 @@ const {
 } = useCalculator()
 
 
-const { counter, incresment, decrement } = useCounter()
+const { counter } = useCounter()
 </script>
 
 <template>
