@@ -6,7 +6,7 @@
 // &these come from node_modules, and Nuxt only auto-imports your own app/
 // &folder — so unlike useCalculator() below, they need real import lines
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/vue'
-import { ChevronDownIcon, ArrowPathIcon } from '@heroicons/vue/20/solid'
+import { ChevronDownIcon, ArrowPathIcon, BeakerIcon } from '@heroicons/vue/20/solid'
 
 const {
   expr, answer, history, displayParts,
@@ -21,6 +21,16 @@ const { counter, incresment, decrement } = useCounter()
 
 <template>
   <main class="flex min-h-screen items-center justify-center bg-amber-500 p-4">
+    <!-- ================= state inspector link ================= -->
+    <!-- &NuxtLink instead of <a>: it swaps the page in place, so useState survives -->
+    <NuxtLink
+      to="/calculus2"
+      class="fixed top-4 left-4 z-50 inline-flex items-center gap-x-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm/6 font-semibold text-white backdrop-blur transition-colors hover:bg-white/25"
+    >
+      <BeakerIcon class="size-5" aria-hidden="true" />
+      <span>Inspector</span>
+    </NuxtLink>
+
     <!-- ================= history drop-down ================= -->
     <div class="fixed top-4 left-1/2 z-50 -translate-x-1/2">
       <Popover class="relative">

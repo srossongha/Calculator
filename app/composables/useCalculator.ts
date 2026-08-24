@@ -5,10 +5,11 @@
 
 export function useCalculator() {
   // ---- state ----
-  const expr = ref('')                    // what you typed, e.g. "5+3-2"
-  const answer = ref<string | null>(null) // the result, after "=" is pressed
-  const lastAnswer = ref(0)               // memory: the last good "=" result
-  const cursor = ref(0)                   // where the next button press goes
+  const expr       = useState('calc-expr', () => '')                     // what you typed
+  const answer = useLocalStorage<string | null>('calc-answer', null) // the result, after "="
+  const lastAnswer = useState('calc-last', () => 0)                      // memory: last good "=" result
+  const cursor     = useState('calc-cursor', () => 0)                    // where the next press goes
+
 
   // ^---- history: every finished sum, newest first, kept across refreshes ---
   // &raw = what to put back in the calculator, shown = what to read on screen.
