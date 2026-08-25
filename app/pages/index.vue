@@ -184,6 +184,7 @@ const { counter } = useCounter()
         <button class="col-span-4 rounded-xl bg-amber-600 py-3 text-xl text-white" @click="equals">=</button>
       </div>
       <div>{{ counter }}</div>
+      <div>hahah</div>
     </section>
   </main>
 </template>
