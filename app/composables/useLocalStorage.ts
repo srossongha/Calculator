@@ -1,9 +1,10 @@
 import type { Ref } from 'vue'
 
 // keeps a ref in sync with localStorage, so its value survives a refresh
-export function useLocalStorage<T>(key: string, initial: T): Ref<T> {
-  const data = ref<T>(initial) as Ref<T>
+export function useLocalStorage<T>(key: string, initial: T) {
+  const data = useState<T>(`ls-${key}`, () => initial)
 
+  
   // localStorage only exists in the browser, and Nuxt renders on the server
   // first — so the saved value is read after the page has mounted
   onMounted(() => {
